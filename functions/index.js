@@ -2,6 +2,7 @@ const functions = require("firebase-functions");
 
 //Initialize Firebase Admin SDK
 const admin = require('firebase-admin');
+const { messaging } = require("firebase-admin");
 admin.initializeApp()
 // // Create and Deploy Your First Cloud Functions
 // // https://firebase.google.com/docs/functions/write-firebase-functions
@@ -11,6 +12,68 @@ exports.helloWorld = functions.https.onRequest((request, response) => {
   response.send("Hello from Firebase!");
 });
 
+
+exports.wroteComment = functions.firestore
+        .document('posts/{postId}/comments/{commentId}')
+        .onCreate(async (snap, context) => {
+
+          let data = snap.data()
+          let commentorId = data.user_id
+          let commentorImageUrl = data.profile_image
+          let commentorUsername = data.display_name
+          let message = data.message
+          let postId = context.params.postId
+
+          console.log(commentorId, commentorImageUrl, commentorUsername, postId)
+
+          var db = admin.firestore();
+
+            return db.collection('posts').doc(postId)
+            .get()
+            .then(snapshot => {
+              
+              let data = snapshot.data();
+              postOwnerId = data.owner_id;
+              let spotName = data.spot_name;
+
+                    return db.collection('users').doc(postOwnerId)
+                    .get()
+                    .then(snapshot => {
+                      let ownerData = snapshot.data();
+                      let fcmToken = ownerData.fcmToken;
+
+                        var payload = {
+                          notification: {
+                            title: 'New comment on ' + spotName,
+                            body: commentorUsername + ': ' + message
+                          },
+                          data: {
+                            userid: commentorId,
+                            profileUrl: commentorImageUrl,
+                            userDisplayName: commentorUsername,
+                            message: message
+                          }
+                        }
+
+                            admin.messaging().sendToDevice(fcmToken, payload)
+                            .then(response => {
+                              console.log('Successfully sent push notifications', response)
+                            })
+                            .catch(error => {
+                              console.log('Failed to send push notifications', error)
+                            })
+
+                      
+                        })
+                    .catch(error => {
+                      console.log('Error fetching fcm token')
+                    })
+                  })    
+            .catch(error => {
+              console.log('Error fetching ownerId')
+            })
+        });
+      
 
 exports.checkedInSpot = functions.firestore
       .document('posts/{postId}/verifiers/{userId}')
