@@ -51,7 +51,8 @@ exports.wroteComment = functions.firestore
                             userid: commentorId,
                             profileUrl: commentorImageUrl,
                             userDisplayName: commentorUsername,
-                            message: message
+                            message: message,
+                            spotId: postId
                           }
                         }
 
@@ -182,7 +183,7 @@ exports.savedSecretSpot = functions.firestore
                                       let followerData = snapshot.data()
                                       let username = followerData.displayName
                                       let imageUrl = followerData.profileImageUrl
-                                      let reputation = String(followerData.streetCred) 
+                                      let reputation = followerData.streetCred 
                                       let bio = followerData.bio
 
                                       var payload = {
