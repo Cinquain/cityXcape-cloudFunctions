@@ -3,6 +3,7 @@ const functions = require("firebase-functions");
 //Initialize Firebase Admin SDK
 const admin = require('firebase-admin');
 const { messaging } = require("firebase-admin");
+const { document } = require("firebase-functions/v1/firestore");
 admin.initializeApp()
 // // Create and Deploy Your First Cloud Functions
 // // https://firebase.google.com/docs/functions/write-firebase-functions
@@ -11,6 +12,50 @@ exports.helloWorld = functions.https.onRequest((request, response) => {
   functions.logger.info("Hello logs!", {structuredData: true});
   response.send("Hello from Firebase!");
 });
+
+
+exports.notifyFollowers = functions.firestore
+      .document('posts/{postId}')
+      .onCreate(async (snapshot, context) => {
+
+        let data = snapshot.data()
+        let ownerId = data.owner_id
+        let ownerName = data.ownerDisplayName
+        let spotName = data.spot_name
+        let spotId = context.params.postId
+
+        var payload = {
+          notification: {
+            title: ownerName + ' posted a new spot', 
+            body: spotName
+          },
+          data: {
+            spotId: spotId
+          }
+        }
+        var db = admin.firestore();
+
+        return db.collection('world').doc('followers').collection(ownerId)
+                .get()
+                .then(snapshot => {
+                  snapshot.forEach( doc => {
+                    let data = doc.data()
+                    let fcmToken = data.fcmToken
+
+                    admin.messaging.sendToDevice(fcmToken, payload)
+                      .then(response => {
+                        console.log('Successfully sent push notification', response)
+                      })
+                      .catch(error => {
+                        console.log('Failed to send push notification', error)
+                      })
+                  })
+                })
+                .catch(error => {
+                    console.log('Failed to fetch followers collection')
+                })
+
+      });
 
 
 exports.wroteComment = functions.firestore
@@ -150,6 +195,8 @@ exports.checkedInSpot = functions.firestore
                   })
       })
 
+
+
 exports.savedSecretSpot = functions.firestore
       .document('posts/{postId}/savedBy/{userId}')
       .onWrite(async (change, context) => {
@@ -183,7 +230,7 @@ exports.savedSecretSpot = functions.firestore
                                       let followerData = snapshot.data()
                                       let username = followerData.displayName
                                       let imageUrl = followerData.profileImageUrl
-                                      let reputation = followerData.streetCred 
+                                      let reputation = String(followerData.streetCred) 
                                       let bio = followerData.bio
 
                                       var payload = {
