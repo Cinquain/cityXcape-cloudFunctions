@@ -13,6 +13,51 @@ exports.helloWorld = functions.https.onRequest((request, response) => {
   response.send("Hello from Firebase!");
 });
 
+exports.newFollower = functions.firestore
+      .document('world/followers/{followingId}/{followerId}')
+      .onCreate(async (snapshot, context) => {
+
+        let followerId = context.params.followerId
+        let followingId = context.params.followingId
+        let data = snapshot.data()
+        let displayName = data.displayName
+        let profile_image = data.profileImageUrl
+
+        var db = admin.firestore();
+
+        return db.collection('users').doc(followingId)
+        .get()
+        .then(snapshot => {
+            let ownerData = snapshot.data();
+            let fcmToken = ownerData.fcmToken;
+
+              var payload = {
+                notification: {
+                  title: 'New Street Follower',
+                  body: displayName + ' is now following you'
+                },
+                data: {
+                  userid: followerId,
+                  profileUrl: profile_image,
+                  userDisplayName: displayName
+                }
+              }
+
+              admin.messaging().sendToDevice(fcmToken, payload)
+              .then(response => {
+                console.log('Successfully sent push notifications', response)
+              })
+              .catch(error => {
+                console.log('Failed to send push notifications', error)
+              })
+
+          })
+          .catch(error => {
+            console.log('Error getting following fcmToken', error)
+          })
+
+      })
+
 
 exports.notifyFollowers = functions.firestore
       .document('posts/{postId}')
@@ -38,7 +83,7 @@ exports.notifyFollowers = functions.firestore
         return db.collection('world').doc('followers').collection(ownerId)
                 .get()
                 .then(snapshot => {
-                  snapshot.forEach( doc => {
+                  snapshot.docs.forEach( doc => {
                     let data = doc.data()
                     let fcmToken = data.fcmToken
 
