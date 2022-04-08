@@ -30,7 +30,6 @@ exports.newFollower = functions.firestore
         .then(snapshot => {
             let ownerData = snapshot.data();
             let fcmToken = ownerData.fcmToken;
-
               var payload = {
                 notification: {
                   title: 'New Street Follower',
@@ -79,15 +78,13 @@ exports.notifyFollowers = functions.firestore
           }
         }
         var db = admin.firestore();
-
         return db.collection('world').doc('followers').collection(ownerId)
                 .get()
                 .then(snapshot => {
-                  snapshot.docs.forEach( doc => {
+                  snapshot.forEach( doc => {
                     let data = doc.data()
                     let fcmToken = data.fcmToken
-
-                    admin.messaging.sendToDevice(fcmToken, payload)
+                    admin.messaging().sendToDevice(fcmToken, payload)
                       .then(response => {
                         console.log('Successfully sent push notification', response)
                       })
@@ -97,7 +94,7 @@ exports.notifyFollowers = functions.firestore
                   })
                 })
                 .catch(error => {
-                    console.log('Failed to fetch followers collection')
+                    console.log('Failed to fetch followers collection', error)
                 })
 
       });
