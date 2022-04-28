@@ -22,14 +22,17 @@ exports.newFollower = functions.firestore
         let data = snapshot.data()
         let displayName = data.displayName
         let profile_image = data.profileImageUrl
-
+        console.log('Following id is ', followingId)
         var db = admin.firestore();
 
         return db.collection('users').doc(followingId)
         .get()
         .then(snapshot => {
-            let ownerData = snapshot.data();
-            let fcmToken = ownerData.fcmToken;
+            let data = snapshot.data();
+            console.log('data is', data)
+            let fcmToken = data.fcmToken;
+            console.log('fcm token is', fcmToken)
+
               var payload = {
                 notification: {
                   title: 'New Street Follower',
