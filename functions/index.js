@@ -164,6 +164,82 @@ exports.wroteComment = functions.firestore
               console.log('Error fetching ownerId')
             })
         });
+
+
+exports.newStamp = functions.firestore
+        .document('world/verified/{userId}/{postId}')
+        .onWrite(async (change, context) => {
+
+
+          let verifierId = context.params.userId
+          let data = change.after.data()
+          console.log(verifierId, data)
+
+          let spotName = data.name;
+          let spotImage = data.imageUrl;
+          let timestamp =  String(data.time);
+          let comment = data.comment;
+          let verifierName = data.verifierName;
+          let verifierImage = data.verifierImageUrl;
+          let spotOwnerId = data.spotOwnerId;
+          let commentCount = String(data.comment_count);
+          let latitude = String(data.latitude);
+          let longitude = String(data.longitude);
+          let city = data.city;
+          let country = data.country;
+          let postId = data.postId;
+          console.log(timestamp)
+
+          const db = admin.firestore()
+
+          return db.collection('world').doc('followers').collection(verifierId)
+                    .get()
+                    .then(snapshot => {
+                        snapshot.forEach(doc => {
+                          let data = doc.data()
+                          let fcmToken = data.fcmToken
+
+                          var payload = {
+                            notification: {
+                              title: verifierName + " got a new stamp",
+                              body: verifierName + ' has checked-in ' + spotName
+                            },
+                            data: {
+                              stampName: spotName,
+                              image: spotImage,
+                              content: comment,
+                              verifierId: verifierId,
+                              verifierImage: verifierImage,
+                              verifierName: verifierName,
+                              time: timestamp,
+                              ownerId: spotOwnerId,
+                              count: commentCount,
+                              latitude: latitude,
+                              longitude: longitude,
+                              city: city,
+                              country: country,
+                              postId: postId,
+                            }
+                          }
+
+                          admin.messaging().sendToDevice(fcmToken, payload)
+                                .then(response => {
+                                  console.log('Successfully sent push notifications', response)
+                                })
+                                .catch(error => {
+                                  console.log('Failed to send push notifications', error)
+                                })
+
+                        })
+                    })
+                    .catch(error => {
+                      console.log('Error finding followers', error)
+                   })
+                        
+
+        })
+      
+    
       
 
 exports.checkedInSpot = functions.firestore
