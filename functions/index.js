@@ -240,7 +240,66 @@ exports.newStamp = functions.firestore
         })
       
     
-      
+exports.newStampComment = functions.firestore
+        .document('world/verified/{userId}/{postId}/comments/{commentId}')
+        .onWrite(async (change, context) => {
+
+          let postId = content.params.postId;
+          let ownerId = context.params.userId;
+          let commentId = content.params.commentId;
+
+          let data = change.after.data();
+          let commentorId = data.user_id;
+          let displayName = data.display_name;
+          let imageUrl = data.profile_image;
+          let bio = data.user_bio;
+          let message = data.message;
+          let date = String(data.date_created);
+
+          console.log(postId, ownerId, commentId);
+          console.log('data is: ', commentorId, displayName, imageUrl, bio, message, date)
+          var db = admin.firestore()
+
+          return db.collection('users').doc(ownerId)
+                      .get()
+                      .then(snapshot => {
+                        let ownerData = snapshot.data();
+                        let fcmToken = ownerData.fcmToken;
+  
+                          var payload = {
+                            notification: {
+                              title: displayName + ' commented on your stamp',
+                              body: content
+                            },
+                            data: {
+                              userid: commentorId,
+                              commnetId: commentId,
+                              profileUrl: imageUrl,
+                              userDisplayName: displayName,
+                              bio: bio,
+                              date: date,
+                              message: message,
+                              spotId: postId
+                            }
+                          }
+  
+                              admin.messaging().sendToDevice(fcmToken, payload)
+                              .then(response => {
+                                console.log('Successfully sent push notifications', response)
+                              })
+                              .catch(error => {
+                                console.log('Failed to send push notifications', error)
+                              })
+
+
+                      })
+                      .catch(error => {
+                        console.log('Error fetching owner of stamp', error)
+                      })
+
+        })
+
+        
 
 exports.checkedInSpot = functions.firestore
       .document('posts/{postId}/verifiers/{userId}')
