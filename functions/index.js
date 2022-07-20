@@ -35,7 +35,7 @@ exports.newFollower = functions.firestore
 
               var payload = {
                 notification: {
-                  title: 'New Street Follower',
+                  title: 'New Street Follower + 1 Streetcred',
                   body: displayName + ' is now following you'
                 },
                 data: {
@@ -168,7 +168,7 @@ exports.wroteComment = functions.firestore
 
 exports.newStamp = functions.firestore
         .document('world/verified/{userId}/{postId}')
-        .onWrite(async (change, context) => {
+        .onCreate(async (change, context) => {
 
 
           let verifierId = context.params.userId
@@ -244,9 +244,9 @@ exports.newStampComment = functions.firestore
         .document('world/verified/{userId}/{postId}/comments/{commentId}')
         .onWrite(async (change, context) => {
 
-          let postId = content.params.postId;
+          let postId = context.params.postId;
           let ownerId = context.params.userId;
-          let commentId = content.params.commentId;
+          let commentId = context.params.commentId;
 
           let data = change.after.data();
           let commentorId = data.user_id;
@@ -269,7 +269,7 @@ exports.newStampComment = functions.firestore
                           var payload = {
                             notification: {
                               title: displayName + ' commented on your stamp',
-                              body: content
+                              body: message
                             },
                             data: {
                               userid: commentorId,
@@ -303,7 +303,7 @@ exports.newStampComment = functions.firestore
 
 exports.checkedInSpot = functions.firestore
       .document('posts/{postId}/verifiers/{userId}')
-      .onWrite(async (change, context) => {
+      .onCreate(async (change, context) => {
 
         let verifierId = context.params.userId;
         let postId = context.params.postId;
