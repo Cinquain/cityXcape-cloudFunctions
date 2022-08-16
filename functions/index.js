@@ -299,6 +299,108 @@ exports.newStampComment = functions.firestore
 
         })
 
+
+exports.newFriendRequest = functions.firestore
+        .document('users/{userId}/request/{friendId}')
+        .onWrite(async (change, context) => {
+          let uid = context.params.userId
+          let data = change.after.data();
+
+          let userId = data.uid;
+          let username = data.displayName;
+          let profileUrl = data.profileUrl;
+          let bio = data.bio;
+          let rank = data.rank;
+          let token = data.fcmToken;
+          let newFriend = 'newRequest'
+          console.log(userId, username, profileUrl, bio, rank, token)
+          var db = admin.firestore();
+
+          return db.collection('users').doc(uid)
+              .get()
+              .then(snapshot => {
+                let ownerData = snapshot.data();
+                let fcmToken = ownerData.fcmToken;
+
+                var payload = {
+                  notification: {
+                    title: "You've got a friend request",
+                    body: username + 'request to be friends'
+                  },
+                  data: {
+                    userid: userId,
+                    profileUrl: profileUrl,
+                    userDisplayName: username,
+                    rank: rank,
+                    fcmToken: token,
+                    friend: newFriend,
+                    biography: bio
+                  }
+                }
+
+                admin.messaging().sendToDevice(fcmToken, payload)
+                  .then(response => {
+                    console.log('Successfully sent push notifications', response)
+                  })
+                  .catch(error => {
+                    console.log('Failed to send push notifications', error)
+                  })
+              })
+              .catch(error => {
+                console.log('Error finding user in database')
+              })
+
+        })
+
+
+exports.newFriend = functions.firestore
+        .document('world/friends/{uid}/{userId}')
+        .onWrite(async (change, context) => {
+          let accepterId = context.params.uid;
+          let requesterId = context.params.userId;
+          let data = change.after.data();
+
+          let username = data.displayName;
+          let profileUrl = data.profileImageUrl;
+          let bio = data.bio;
+          let rank = data.rank;
+          console.log(username, profileUrl, bio, rank)
+          var db = admin.firestore();
+
+          return db.collection('users').doc(accepterId)
+                      .get()
+                      .then(snapshot => {
+                        let ownerData = snapshot.data();
+                        let fcmToken = ownerData.fcmToken;
+
+                        var payload = {
+                          notification: {
+                            title: "You've got a new friend",
+                            body: username + ' and you are now friends'
+                          },
+                          data: {
+                            userid: requesterId,
+                            profileUrl: profileUrl,
+                            userDisplayName: username,
+                            biography: bio,
+                            rank: rank
+                          }
+                        }
+
+                          admin.messaging().sendToDevice(fcmToken, payload)
+                          .then(response => {
+                            console.log('Successfully sent push notifications', response)
+                          })
+                          .catch(error => {
+                            console.log('Failed to send push notifications', error)
+                          })
+
+                      })
+                      .catch(error => {
+                        console.log('Error accessing user branch', error)
+                      })
+
+        })
         
 
 exports.checkedInSpot = functions.firestore
@@ -450,6 +552,4 @@ exports.savedSecretSpot = functions.firestore
         .catch(error => {
           console.log('Error accessing data from Firestore branch' + error)
         })
-
-        
       })
