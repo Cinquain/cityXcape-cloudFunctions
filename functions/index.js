@@ -300,6 +300,56 @@ exports.newStampComment = functions.firestore
         })
 
 
+exports.newMessage = functions.firestore
+        .document('recent_messages/{toId}/messages/{fromId}')
+        .onWrite(async (change, context) => {
+            let uid = context.params.toId;
+            let fromId = context.params.fromId;
+            let data = change.after.data();
+            let profileUrl = data.profileUrl;
+            let displayName = data.displayName;
+            let bio = data.bio;
+            let rank = data.rank;
+            let content = data.content;
+
+            var db = admin.firestore();
+
+            return db.collection('users').doc(uid)
+                .get()
+                .then(snapshot => {
+                  let ownerData = snapshot.data();
+                  let fcmToken = ownerData.fcmToken;
+
+                  var payload = {
+                    notification: {
+                      title: "New message from " + displayName,
+                      body: content
+                    },
+                    data: {
+                      userid: fromId,
+                      profileUrl: profileUrl,
+                      rank: rank,
+                      biography: bio,
+                      userDisplayName: displayName
+                    }
+                  }
+
+                  admin.messaging().sendToDevice(fcmToken, payload)
+                  .then(response => {
+                    console.log('Successfully sent push notifications', response)
+                  })
+                  .catch(error => {
+                    console.log('Failed to send push notifications', error)
+                  })
+
+                })
+                .catch(error => {
+                  console.log('Error finding user in database', error)
+                })
+
+        })
+
+
 exports.newFriendRequest = functions.firestore
         .document('users/{userId}/request/{friendId}')
         .onWrite(async (change, context) => {
@@ -312,7 +362,7 @@ exports.newFriendRequest = functions.firestore
           let bio = data.bio;
           let rank = data.rank;
           let token = data.fcmToken;
-          let newFriend = 'newRequest'
+          let newFriend = 'newRequest';
           console.log(userId, username, profileUrl, bio, rank, token)
           var db = admin.firestore();
 
@@ -325,7 +375,7 @@ exports.newFriendRequest = functions.firestore
                 var payload = {
                   notification: {
                     title: "You've got a friend request",
-                    body: username + 'request to be friends'
+                    body: username + ' request to be friends'
                   },
                   data: {
                     userid: userId,
