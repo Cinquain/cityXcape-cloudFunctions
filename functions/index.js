@@ -349,6 +349,47 @@ exports.newMessage = functions.firestore
 
         })
 
+exports.shareSpot = functions.firestore
+        .document('world/shared/{uid}/{spotId}')
+        .onWrite(async (change, context) => {
+          let uid = context.params.uid;
+          let spotId = context.params.spotId;
+          let data = change.after.data();
+          let username = data.from_username;
+          let spotName = data.spot_title;
+          var db = admin.firestore();
+          console.log(spotId)
+          return db.collection('users').doc(uid)
+                    .get()
+                    .then(snapshot => {
+                      let ownerData = snapshot.data()
+                      let fcmToken = ownerData.fcmToken;
+
+
+                      var payload = {
+                        notification: {
+                          title: username + " just shared a spot with you",
+                          body: spotName
+                        },
+                        data: {
+                          spotId: spotId
+                        }
+                      }
+
+                      admin.messaging().sendToDevice(fcmToken, payload)
+                      .then(response => {
+                        console.log('Successfully sent push notifications', response)
+                      })
+                      .catch(error => {
+                        console.log('Failed to send push notifications', error)
+                      })
+
+                    })
+                    .catch(error => {
+                      console.log('Error finding user in database')
+                    })
+
+        })
 
 exports.newFriendRequest = functions.firestore
         .document('users/{userId}/request/{friendId}')
