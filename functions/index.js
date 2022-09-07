@@ -349,6 +349,106 @@ exports.newMessage = functions.firestore
 
         })
 
+exports.giveProps = functions.firestore
+        .document('world/verified/{uid}/{postId}/propsby/{userId}')
+        .onWrite(async (change, context) => {
+          let ownerId = context.params.uid;
+          let followerId = context.params.userId;
+
+          let data = change.after.data();
+
+          let username = data.displayName;
+          let imageUrl = data.profileImageUrl;
+          let bio = data.bio;
+          let rank = data.rank;
+
+          var db = admin.firestore();
+
+          return db.collection('users').doc(ownerId)
+                   .get()
+                   .then(snapshot => {
+                        let ownerData = snapshot.data()
+                        let fcmToken = ownerData.fcmToken;
+
+                        var payload = {
+                          notification: {
+                            title: username + " gave you props",
+                            body: "You earned 1 StreetCred"
+                          },
+                          data: {
+                            userid: followerId,
+                            profileUrl: imageUrl,
+                            userDisplayName: username,
+                            rank: rank,
+                            biography: bio
+                          }
+                        }
+
+                      admin.messaging().sendToDevice(fcmToken, payload)
+                      .then(response => {
+                        console.log('Successfully sent push notifications', response)
+                      })
+                      .catch(error => {
+                        console.log('Failed to send push notifications', error)
+                      })
+
+                   })
+                   .catch(error => {
+                        console.log('Error finding user in database', error)
+                  })
+
+        })
+
+exports.likedStamp = functions.firestore
+        .document('world/verified/{uid}/{postId}/likedby/{userId}')
+        .onWrite(async (change, context) => {
+          let ownerId = context.params.uid;
+          let followerId = context.params.userId;
+
+          let data = change.after.data();
+
+          let username = data.displayName;
+          let imageUrl = data.profileImageUrl;
+          let bio = data.bio;
+          let rank = data.rank;
+
+          var db = admin.firestore();
+
+          return db.collection('users').doc(ownerId)
+                    .get()
+                    .then(snapshot => {
+                      let ownerData = snapshot.data()
+                      let fcmToken = ownerData.fcmToken;
+
+                      var payload = {
+                        notification: {
+                          title: username + " liked your stamp",
+                          body: "You earned 0.1 StreetCred"
+                        },
+                        data: {
+                          userid: followerId,
+                          profileUrl: imageUrl,
+                          userDisplayName: username,
+                          rank: rank,
+                          biography: bio
+                        }
+                      }
+
+                      admin.messaging().sendToDevice(fcmToken, payload)
+                      .then(response => {
+                        console.log('Successfully sent push notifications', response)
+                      })
+                      .catch(error => {
+                        console.log('Failed to send push notifications', error)
+                      })
+
+                    })
+                    .catch(error => {
+                      console.log('Error finding user in database', error)
+                    })
+
+        })
+
 exports.shareSpot = functions.firestore
         .document('world/shared/{uid}/{spotId}')
         .onWrite(async (change, context) => {
@@ -386,7 +486,7 @@ exports.shareSpot = functions.firestore
 
                     })
                     .catch(error => {
-                      console.log('Error finding user in database')
+                      console.log('Error finding user in database', error)
                     })
 
         })
