@@ -4,6 +4,7 @@ const functions = require("firebase-functions");
 const admin = require('firebase-admin');
 const { messaging } = require("firebase-admin");
 const { document } = require("firebase-functions/v1/firestore");
+const { user } = require("firebase-functions/v1/auth");
 admin.initializeApp()
 // // Create and Deploy Your First Cloud Functions
 // // https://firebase.google.com/docs/functions/write-firebase-functions
@@ -399,6 +400,73 @@ exports.giveProps = functions.firestore
 
         })
 
+exports.newWorld = functions.firestore
+        .document('worlds/{worldName}')
+        .onWrite(async (change, context) => {
+          let worldName = context.params.worldName;
+          let data = change.after.data();
+          let email = data.owner_email;
+          let ownerName = data.owner_name;
+          let ownerId = data.owner_id;
+
+          admin.firestore().add({
+            to: email,
+            message: {
+              subject: 'New World Created by' + ownerName,
+              html: ownerId + ' has created a world named ' + worldName,
+            },
+          })
+        })
+
+
+
+exports.newWorldMember = functions.firestore
+        .document('worlds/{worldName}/members/{userId}')
+        .onCreate(async (snapshot, context) => {
+          let worldName = context.params.worldName;
+          let data = snapshot.data()
+
+          let uid = context.params.userId;
+          let username = data.displayName;
+          let profileUrl = data.profileImageUrl;
+          let bio = data.bio;
+          var db = admin.firestore();
+
+          var payload = {
+            notification: {
+              title: 'New member! World is growing', 
+              body: username + " has become a " + worldName
+            },
+            data: {
+              userid: uid,
+              profileUrl: profileUrl,
+              userDisplayName: username,
+              biography: bio
+            }
+          }
+
+          return db.collection('worlds').doc(worldName).collection('members')
+                    .get()
+                    .then(snapshot => {
+                      snapshot.forEach(doc => {
+                        let data = doc.data();
+                        let fcmToken = data.fcmToken;
+
+                          admin.messaging().sendToDevice(fcmToken, payload)
+                          .then(response => {
+                            console.log('Successfully sent push notifications', response)
+                          })
+                          .catch(error => {
+                            console.log('Failed to send push notifications', error)
+                          })
+
+                      })
+                    })
+                    .catch(error => {
+                        console.log('Error fetching world members', error)
+                    })
+        })
+
 exports.likedStamp = functions.firestore
         .document('world/verified/{uid}/{postId}/likedby/{userId}')
         .onWrite(async (change, context) => {
@@ -491,6 +559,45 @@ exports.shareSpot = functions.firestore
 
         })
 
+
+exports.worldInvitation = functions.firestore
+        .document('users/{userId}/invite/{worldName}')
+        .onCreate(async (snapshot, context) => {
+            let uid = context.params.userId;
+            let worldName = context.params.worldName;
+            let data = snapshot.data()
+            let username = data.displayName;
+            var db = admin.firestore();
+
+            return db.collection('users').doc(uid)
+                    .get()
+                    .then(snapshot => {
+                        let ownerData = snapshot.data();
+                        let fcmToken = ownerData.fcmToken;
+        
+                        var payload = {
+                          notification: {
+                            title: 'You got a world invitation',
+                            body: username + " invited you to the " + worldName + " community"
+                          },
+                          data: {
+                            worldName: worldName
+                          }
+                        }
+        
+                        admin.messaging().sendToDevice(fcmToken, payload)
+                          .then(response => {
+                            console.log('Successfully sent push notifications', response)
+                          })
+                          .catch(error => {
+                            console.log('Failed to send push notifications', error)
+                          })
+                    })
+                    .catch(error => {
+                      console.log('Error retrieving users from database', error)
+                    })
+        })
+
 exports.newFriendRequest = functions.firestore
         .document('users/{userId}/request/{friendId}')
         .onWrite(async (change, context) => {
@@ -543,7 +650,95 @@ exports.newFriendRequest = functions.firestore
 
         })
 
+exports.nearbyMember = functions.firestore
+        .document('users/{uid}/nearby/{userId}')
+        .onCreate(async (snaphot, context) => {
 
+          let senderId = context.params.userId;
+          let data = snaphot.data();
+
+          let username = data.displayName;
+          let profileUrl = data.profileImageUrl;
+          let bio = data.bio;
+          let rank = data.rank;
+          let tribe = data.tribe;
+          let senderToken = data.fcmToken;
+          let fcmToken = data.nearbyToken;
+
+          var payload = {
+            notification: {
+              title: "There is a " + tribe + " nearby",
+              body: username + ' is within a mile'
+            },
+            data: {
+              userid: senderId,
+              profileUrl: profileUrl,
+              userDisplayName: username,
+              biography: bio,
+              rank: rank,
+              fcmToken: senderToken
+            }
+          }
+
+          admin.messaging().sendToDevice(fcmToken, payload)
+          .then(response => {
+            console.log('Successfully sent push notifications', response)
+          })
+          .catch(error => {
+            console.log('Failed to send push notifications', error)
+          })
+
+        })
+
+exports.newSpotForWorld = functions.firestore
+        .document('worlds/{world}/posts/{spotId}')
+        .onCreate(async (snapshot, context) => {
+          let worldName = context.params.world;
+          let spotId = context.params.spotId;
+          let data = snapshot.data();
+          let spotName = data.spot_name;
+          let username = data.ownerDisplayName;
+
+          console.log(worldName, spotName, username)
+
+          var payload = {
+            notification: {
+              title: "New spot in " + worldName + " world",
+              body: username + " posted " + spotName
+            },
+            data: {
+              spotId: spotId,
+              isPrivate: 'true'
+            }
+          }
+
+          var db = admin.firestore();
+
+          return db.collection('worlds')
+                    .doc(worldName)
+                    .collection('members')
+                    .get()
+                    .then(snapshot => {
+                        snapshot.forEach(doc => {
+                          let data = doc.data();
+                          let fcmToken = data.fcmToken;
+  
+                            admin.messaging().sendToDevice(fcmToken, payload)
+                            .then(response => {
+                              console.log('Successfully sent push notifications', response)
+                            })
+                            .catch(error => {
+                              console.log('Failed to send push notifications', error)
+                            })
+
+                        })
+                    })
+                    .catch(error => {
+                      console.log('Failed to get users from world branch', error)
+                    })
+
+        })
+    
 exports.newFriend = functions.firestore
         .document('world/friends/{uid}/{userId}')
         .onWrite(async (change, context) => {
@@ -555,7 +750,6 @@ exports.newFriend = functions.firestore
           let profileUrl = data.profileImageUrl;
           let bio = data.bio;
           let rank = data.rank;
-          console.log(username, profileUrl, bio, rank)
           var db = admin.firestore();
 
           return db.collection('users').doc(accepterId)
